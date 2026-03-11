@@ -99,7 +99,7 @@ function appendLocalLog_(level, item, content, runId, extra) {
     const sh = ss.getSheetByName("Log") || _ensureSheet_(ss, "Log", LOG_HEADER);
 
     const now = new Date();
-    const executor = _safeExecutorEmail_();
+    const executor = "masked_user";
     const extraStr = extra ? JSON.stringify(extra) : "";
 
     // ["日時","種類","項目","内容","実行ID","実行者","詳細データ"]
@@ -197,11 +197,7 @@ function postTriggerStatusToAdmin_() {
  * 実行ユーザー（取れなければ unknown）
  */
 function _safeExecutorEmail_() {
-  try {
-    return Session.getEffectiveUser().getEmail();
-  } catch (e) {
-    return "unknown";
-  }
+  return "masked_user";
 }
 
 /**
