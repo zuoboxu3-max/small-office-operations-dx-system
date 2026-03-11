@@ -34,20 +34,20 @@ const gojuonMap = {
 
 // 転記項目のマッピング設定
 const FIELD_MAPPINGS = [
-  { label: "利用者ID", altLabels: ["利用者ID","ID"], keys: ["利用者ID"], offset: 1 },
-  { label: "氏名", altLabels: ["利用者氏名","氏名","児童氏名"], keys: ["氏名（必須）"], offset: 1 },
-  { label: "性別", altLabels: ["性別"], keys: ["性別"], offset: 1 },
+  { label: "レコードID", altLabels: ["レコードID", "ID"], keys: ["レコードID"], offset: 1 },
+  { label: "氏名", altLabels: ["氏名", "対象者氏名", "利用者氏名"], keys: ["氏名"], offset: 1 },
+  { label: "属性A", altLabels: ["属性A"], keys: ["属性A"], offset: 1 },
   { label: "年齢", altLabels: ["年齢"], keys: ["年齢"], offset: 1 },
-  { label: "生年月日", altLabels: ["生年月日"], keys: ["生年月日"], offset: 1 },
-  { label: "支援区分", altLabels: ["支援区分","障害支援区分"], keys: ["支援区分"], offset: 1 },
-  { label: "受給者証番号", altLabels: ["受給者証番号"], keys: ["障害福祉サービス受給者証番号"], offset: 1 },
-  { label: "上限額", altLabels: ["利用者負担上限額","負担上限額"], keys: ["利用者負担上限額"], offset: 1 },
-  { label: "相談支援事業者", altLabels: ["相談支援事業者名"], keys: ["相談支援事業者名"], offset: 1 },
-  { label: "担当者", altLabels: ["計画作成担当者"], keys: ["計画作成担当者"], offset: 1 },
-  { label: "計画作成日", altLabels: ["計画作成日"], keys: ["計画作成日"], offset: 1 },
-  { label: "モニタリング日", altLabels: ["モニタリング実施日"], keys: ["モニタリング実施日"], offset: 1 },
+  { label: "基礎情報日付", altLabels: ["基礎情報日付"], keys: ["基礎情報日付"], offset: 1 },
+  { label: "区分", altLabels: ["区分", "分類区分"], keys: ["区分"], offset: 1 },
+  { label: "管理番号", altLabels: ["管理番号"], keys: ["管理番号"], offset: 1 },
+  { label: "上限額", altLabels: ["上限額", "負担上限額"], keys: ["上限額"], offset: 1 },
+  { label: "関連機関", altLabels: ["関連機関名"], keys: ["関連機関名"], offset: 1 },
+  { label: "担当者", altLabels: ["担当者"], keys: ["担当者"], offset: 1 },
+  { label: "作成日", altLabels: ["作成日"], keys: ["作成日"], offset: 1 },
+  { label: "実施日", altLabels: ["実施日"], keys: ["実施日"], offset: 1 },
   { label: "住所", altLabels: ["住所"], keys: ["住所"], offset: 1 },
-  { label: "電話", altLabels: ["電話番号","電話"], keys: ["電話"], offset: 1 }
+  { label: "連絡先", altLabels: ["連絡先", "電話"], keys: ["連絡先"], offset: 1 }
 ];
 
 // =================================================================
