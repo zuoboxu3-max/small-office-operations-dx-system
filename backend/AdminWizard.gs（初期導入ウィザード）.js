@@ -108,10 +108,10 @@ function adminBootstrapWizard() {
     }
   } else {
     try {
-      ss.toast("50音整理を実行中です...", "実行中", -1);
-      copyAndOrganizeTo50On_FromProps_();
-      ss.toast("整理が完了しました。", "完了", 5);
-      appendLocalLog_("INFO", "WIZARD", "50音整理が完了しました", runId, {});
+     ss.toast("階層整理を実行中です...", "実行中", -1);
+copyAndOrganizeByRule_FromProps_();
+ss.toast("整理が完了しました。", "完了", 5);
+appendLocalLog_("INFO", "WIZARD", "階層整理が完了しました", runId, {});
     } catch (e) {
       appendLocalLog_("ERROR", "WIZARD", "50音整理でエラーが発生しました", runId, { error: String(e && e.stack ? e.stack : e) });
       ui.alert("整理中にエラーが発生しました。ログを確認してください。");
