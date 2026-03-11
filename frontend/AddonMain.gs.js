@@ -158,7 +158,7 @@ function executeBatch_(options) {
 }
 
 // =================================================================
-// ⚙️ 転記メインロジック
+// ⚙️ 転記メインロジック（公開版ポートフォリオ向け）
 // =================================================================
 
 function pushAllTargets(row) {
@@ -166,45 +166,49 @@ function pushAllTargets(row) {
   const sheet = ss.getSheetByName(MASTER_SHEET_NAME);
   const colMap = getHeaderToColMap_(sheet);
   const rowObj = getRowObjectByHeader_(sheet, row);
-  
-  // 1. 氏名と頭文字をrowObjから確実に取得
-  const userName = String(rowObj["氏名（必須）"] || "").trim();
-  const initial = String(rowObj["頭文字（必須）"] || "").trim();
-  
-  if (!userName || userName === "undefined") throw new Error("氏名が空です");
-  if (!initial) throw new Error("頭文字が入力されていません（ア、カ、サ等）");
 
-  // 2. フォルダの取得（頭文字フォルダ > 個人名フォルダ）
-  const userFolder = getTargetFolderByHierarchy_(userName, initial);
+  // 1. 公開版では対象レコード名と分類キーを取得
+  const recordName = "対象レコード";
+ const initial = String(rowObj["分類キー"] || "").trim();
+　if (!initial) throw new Error("分類キーが入力されていません");
+
+  // 2. フォルダの取得（分類フォルダ > 対象フォルダ）
+  const targetFolder = getTargetFolderByHierarchy_(recordName, initial);
 
   TARGET_SPREADSHEET_IDS.forEach(id => {
     const templateFile = DriveApp.getFileById(id);
-    const targetFileName = `${templateFile.getName()}_${userName}`;
-    
+    const targetFileName = `${templateFile.getName()}_${recordName}`;
+
     // 同名ファイルがあるか確認
-    const existingFiles = userFolder.getFilesByName(targetFileName);
-    let targetSSFile = existingFiles.hasNext() ? existingFiles.next() : templateFile.makeCopy(targetFileName, userFolder);
-    let targetSS = SpreadsheetApp.openById(targetSSFile.getId());
-    
-    // 3. コピー元シートを固定（1枚目のシートが原本という前提、または名前指定）
-    // 常に「原本」という名前のシートをコピーするようにするとミスがありません
-    const templateSheet = targetSS.getSheets().find(s => s.getName().includes("原本")) || targetSS.getSheets()[0];
-    
+    const existingFiles = targetFolder.getFilesByName(targetFileName);
+    const targetSSFile = existingFiles.hasNext()
+      ? existingFiles.next()
+      : templateFile.makeCopy(targetFileName, targetFolder);
+
+    const targetSS = SpreadsheetApp.openById(targetSSFile.getId());
+
+    // 3. コピー元シートを固定
+    const templateSheet =
+      targetSS.getSheets().find(s => s.getName().includes("原本")) ||
+      targetSS.getSheets()[0];
+
     const nowStr = Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyyMMdd_HHmm");
-    const newSheetName = `${userName}_${nowStr}`; // シート名はシンプルに
-    
+    const newSheetName = `${recordName}_${nowStr}`;
+
     // シートコピーと転記実行
     const newSheet = templateSheet.copyTo(targetSS).setName(newSheetName);
     applyMappingsByLabel_(newSheet, rowObj, FIELD_MAPPINGS);
 
-    // 4. 新しいシートを一番左（先頭）へ移動し、アクティブにする
+    // 4. 新しいシートを先頭へ移動し、アクティブにする
     newSheet.activate();
-    targetSS.moveActiveSheet(1); 
+    targetSS.moveActiveSheet(1);
   });
 
   // 完了記録
   sheet.getRange(row, colMap[DONE_HEADER]).setValue("✅完了(履歴保存)").setBackground("#d9ead3");
-  if (colMap[DONE_AT_HEADER]) sheet.getRange(row, colMap[DONE_AT_HEADER]).setValue(new Date());
+  if (colMap[DONE_AT_HEADER]) {
+    sheet.getRange(row, colMap[DONE_AT_HEADER]).setValue(new Date());
+  }
 }
 
 // =================================================================
