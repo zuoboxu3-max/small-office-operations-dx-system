@@ -74,7 +74,7 @@ function _postToAdmin_(action, payload) {
 
 /** 実行者のメアドを取得 */
 function _safeExecutorEmail_() {
-  return "anonymous@example.com";
+  return "masked_user";
 }
 
 function testAdminLog() {
