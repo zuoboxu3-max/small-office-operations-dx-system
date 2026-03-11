@@ -95,7 +95,7 @@ function adminBootstrapWizard() {
     const res = ui.alert("確認", "移行元が未設定です。50音の『箱（あ〜わ行）』だけ作成しますか？", ui.ButtonSet.YES_NO);
     if (res === ui.Button.YES) {
       try {
-        ensure50OnSkeleton_FromProps_();
+        ensureFolderSkeleton_FromProps_();
         appendLocalLog_("INFO", "WIZARD", "箱作り（行フォルダ）を作成しました", runId, {});
       } catch (e) {
         appendLocalLog_("ERROR", "WIZARD", "箱作りに失敗しました", runId, { error: String(e) });
