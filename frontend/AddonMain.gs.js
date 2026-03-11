@@ -65,95 +65,125 @@ function onOpen() {
 }
 
 /**
- * チェックボックスのリセット（利便性向上）
+ * チェックボックスのリセット
  */
 function resetAllCheckboxes_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(MASTER_SHEET_NAME);
   if (!sheet) return;
+
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return;
+
   const colMap = getHeaderToColMap_(sheet);
-  
   const targets = [TRIGGER_HEADER, CAL_TRIGGER_HEADER];
+
   targets.forEach(header => {
     const colIndex = colMap[header];
     if (colIndex) {
       sheet.getRange(2, colIndex, lastRow - 1, 1).uncheck();
     }
   });
+
   ss.toast("準備完了です。", "システム", 3);
 }
 
-function processAllSelected() { executeBatch_({ doDrive: true, doCalendar: true }); }
-function processOnlyCalendar() { executeBatch_({ doDrive: false, doCalendar: true }); }
+function processAllSelected() {
+  executeBatch_({ doDrive: true, doCalendar: true });
+}
+
+function processOnlyCalendar() {
+  executeBatch_({ doDrive: false, doCalendar: true });
+}
 
 /**
  * 一括処理のメインエンジン
  */
-/**
- * 一括処理のメインエンジン（ログ送信機能付き）
- */
 function executeBatch_(options) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(MASTER_SHEET_NAME);
-  if (!sheet) { ss.toast("シート「" + MASTER_SHEET_NAME + "」が見つかりません。"); return; }
-  
-  const runId = Utilities.getUuid(); // 今回の実行を一意に特定するID
+
+  if (!sheet) {
+    ss.toast('シート「' + MASTER_SHEET_NAME + '」が見つかりません。');
+    return;
+  }
+
+  const runId = Utilities.getUuid();
   logInfoToAdmin_(runId, "BATCH_START", "一括処理を開始しました", { options });
 
   const data = sheet.getDataRange().getValues();
   const colMap = getHeaderToColMap_(sheet);
 
-  let targetRows = [];
+  const targetRows = [];
   for (let i = 1; i < data.length; i++) {
-    const isDriveCheck = options.doDrive && data[i][colMap[TRIGGER_HEADER]-1] === true;
-    const isCalCheck = options.doCalendar && data[i][colMap[CAL_TRIGGER_HEADER]-1] === true;
+    const isDriveCheck = options.doDrive && data[i][colMap[TRIGGER_HEADER] - 1] === true;
+    const isCalCheck = options.doCalendar && data[i][colMap[CAL_TRIGGER_HEADER] - 1] === true;
+
     if (isDriveCheck || isCalCheck) {
-      targetRows.push({rowNum: i + 1, doDrive: isDriveCheck, doCal: isCalCheck});
+      targetRows.push({
+        rowNum: i + 1,
+        doDrive: isDriveCheck,
+        doCal: isCalCheck
+      });
     }
   }
 
-  if (targetRows.length === 0) { 
-    ss.toast("対象が選択されていません。", "中断"); 
+  if (targetRows.length === 0) {
+    ss.toast("対象が選択されていません。", "中断");
     logInfoToAdmin_(runId, "BATCH_CANCEL", "対象選択なしで終了");
-    return; 
+    return;
   }
 
   targetRows.forEach((item, index) => {
     const rowNum = item.rowNum;
+
     try {
       const rowObj = getRowObjectByHeader_(sheet, rowNum);
-      const userName = rowObj["氏名（必須）"] || "不明";
+
+      // 公開版では表示名を固定化
+      const recordLabel = "対象レコード";
 
       // 1. カレンダー登録
       if (item.doCal) {
         createCalendarEventsInternal_(rowNum, rowObj);
         sheet.getRange(rowNum, colMap[CAL_TRIGGER_HEADER]).setValue(false);
-        logInfoToAdmin_(runId, "CALENDAR_SUCCESS", `${userName}様のカレンダー登録完了`, { rowNum });
+
+        logInfoToAdmin_(
+          runId,
+          "CALENDAR_SUCCESS",
+          "処理対象のカレンダー登録完了",
+          { rowNum, recordLabel }
+        );
       }
 
-      // 2. ドライブ転記
+      // 2. Drive転記
       if (item.doDrive) {
         pushAllTargets(rowNum);
         sheet.getRange(rowNum, colMap[TRIGGER_HEADER]).setValue(false);
-        logInfoToAdmin_(runId, "DRIVE_SUCCESS", `${userName}様のドライブ転記完了`, { rowNum });
+
+        logInfoToAdmin_(
+          runId,
+          "DRIVE_SUCCESS",
+          "処理対象のDrive転記完了",
+          { rowNum, recordLabel }
+        );
       }
-      
+
       SpreadsheetApp.flush();
       ss.toast(`${targetRows.length}件中 ${index + 1}件完了`, "進捗");
 
     } catch (e) {
       const errorCol = colMap[DONE_HEADER] || 1;
-      sheet.getRange(rowNum, errorCol).setValue("❌エラー: " + e.message).setBackground("#f4cccc");
-      
-      // 管理者へ詳細なエラーを送信
+      sheet.getRange(rowNum, errorCol)
+        .setValue("❌エラー: " + e.message)
+        .setBackground("#f4cccc");
+
       logErrorToAdmin_(runId, "ROW_FATAL", e, { rowNum, options });
     }
   });
 
   logInfoToAdmin_(runId, "BATCH_END", "一括処理を正常に終了しました");
-  postTriggerStatusToAdmin_(); // 最後にトリガー状態を管理者に同期
+  postTriggerStatusToAdmin_();
   ss.toast("全工程が終了しました。");
 }
 
@@ -167,19 +197,22 @@ function pushAllTargets(row) {
   const colMap = getHeaderToColMap_(sheet);
   const rowObj = getRowObjectByHeader_(sheet, row);
 
-  // 1. 公開版では対象レコード名と分類キーを取得
-  const recordName = "対象レコード";
- const initial = String(rowObj["分類キー"] || "").trim();
-　if (!initial) throw new Error("分類キーが入力されていません");
+  // 公開版では表示名を固定化
+  const recordLabel = "対象レコード";
 
-  // 2. フォルダの取得（分類フォルダ > 対象フォルダ）
-  const targetFolder = getTargetFolderByHierarchy_(recordName, initial);
+  // 公開版では分類キーとして扱う
+  const recordKey = String(rowObj["分類キー"] || "").trim();
+  if (!recordKey) {
+    throw new Error("分類キーが入力されていません");
+  }
+
+  // 保存先フォルダの取得（分類フォルダ > 対象フォルダ）
+  const targetFolder = getTargetFolderByHierarchy_(recordLabel, recordKey);
 
   TARGET_SPREADSHEET_IDS.forEach(id => {
     const templateFile = DriveApp.getFileById(id);
-    const targetFileName = `${templateFile.getName()}_${recordName}`;
+    const targetFileName = `${templateFile.getName()}_${recordLabel}`;
 
-    // 同名ファイルがあるか確認
     const existingFiles = targetFolder.getFilesByName(targetFileName);
     const targetSSFile = existingFiles.hasNext()
       ? existingFiles.next()
@@ -187,25 +220,24 @@ function pushAllTargets(row) {
 
     const targetSS = SpreadsheetApp.openById(targetSSFile.getId());
 
-    // 3. コピー元シートを固定
     const templateSheet =
       targetSS.getSheets().find(s => s.getName().includes("原本")) ||
       targetSS.getSheets()[0];
 
     const nowStr = Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyyMMdd_HHmm");
-    const newSheetName = `${recordName}_${nowStr}`;
+    const newSheetName = `${recordLabel}_${nowStr}`;
 
-    // シートコピーと転記実行
     const newSheet = templateSheet.copyTo(targetSS).setName(newSheetName);
     applyMappingsByLabel_(newSheet, rowObj, FIELD_MAPPINGS);
 
-    // 4. 新しいシートを先頭へ移動し、アクティブにする
     newSheet.activate();
     targetSS.moveActiveSheet(1);
   });
 
-  // 完了記録
-  sheet.getRange(row, colMap[DONE_HEADER]).setValue("✅完了(履歴保存)").setBackground("#d9ead3");
+  sheet.getRange(row, colMap[DONE_HEADER])
+    .setValue("✅完了(履歴保存)")
+    .setBackground("#d9ead3");
+
   if (colMap[DONE_AT_HEADER]) {
     sheet.getRange(row, colMap[DONE_AT_HEADER]).setValue(new Date());
   }
@@ -220,23 +252,27 @@ function createCalendarEventsInternal_(rowNum, rowObj) {
   const sheet = ss.getSheetByName(MASTER_SHEET_NAME);
   const colMap = getHeaderToColMap_(sheet);
   const calendar = CalendarApp.getCalendarById(CALENDAR_ID);
-  if (!calendar) throw new Error("カレンダーIDが見つかりません: " + CALENDAR_ID);
 
-  const userName = rowObj["氏名（必須）"] || "不明";
-  
+  if (!calendar) {
+    throw new Error("カレンダーIDが見つかりません: " + CALENDAR_ID);
+  }
+
+  const recordLabel = "対象レコード";
+
   const dateFields = [
-    { name: "モニタリング", val: rowObj["モニタリング日"] },
-    { name: "計画作成", val: rowObj["計画作成日"] }
+    { name: "モニタリング", val: rowObj["実施日"] || rowObj["モニタリング日"] },
+    { name: "計画作成", val: rowObj["作成日"] || rowObj["計画作成日"] }
   ];
-  
+
   dateFields.forEach(field => {
     let d = field.val;
     if (d && !(d instanceof Date)) d = new Date(d);
-    
+
     if (d instanceof Date && !isNaN(d.getTime())) {
-      const title = `【${field.name}】${userName}様`;
+      const title = `【${field.name}】${recordLabel}`;
+
       // 同日の同一タイトル重複チェック
-      const exist = calendar.getEventsForDay(d, {search: title});
+      const exist = calendar.getEventsForDay(d, { search: title });
       if (exist.length === 0) {
         calendar.createAllDayEvent(title, d);
       }
@@ -245,7 +281,9 @@ function createCalendarEventsInternal_(rowNum, rowObj) {
 
   const statusCol = colMap[CAL_DONE_HEADER];
   if (statusCol) {
-    sheet.getRange(rowNum, statusCol).setValue("✅完了").setBackground("#d9ead3");
+    sheet.getRange(rowNum, statusCol)
+      .setValue("✅完了")
+      .setBackground("#d9ead3");
   }
 }
 
@@ -253,17 +291,20 @@ function createCalendarEventsInternal_(rowNum, rowObj) {
 // 🛠 ヘルパー関数群
 // =================================================================
 
-function getTargetFolderByHierarchy_(userName, firstChar) {
+function getTargetFolderByHierarchy_(recordLabel, recordKey) {
   const parentFolder = DriveApp.getFolderById(PARENT_FOLDER_ID);
-  let gyoName = "11_その他";
-  
-  for (let key in gojuonMap) {
-    if (gojuonMap[key].includes(firstChar)) { gyoName = key; break; }
+  let groupName = "11_その他";
+
+  for (const key in gojuonMap) {
+    if (gojuonMap[key].includes(recordKey)) {
+      groupName = key;
+      break;
+    }
   }
-  
-  const gyoFolder = getOrCreateSubFolder_(parentFolder, gyoName);
-  const charFolder = getOrCreateSubFolder_(gyoFolder, firstChar);
-  return getOrCreateSubFolder_(charFolder, userName);
+
+  const groupFolder = getOrCreateSubFolder_(parentFolder, groupName);
+  const keyFolder = getOrCreateSubFolder_(groupFolder, recordKey);
+  return getOrCreateSubFolder_(keyFolder, recordLabel);
 }
 
 function getOrCreateSubFolder_(parent, name) {
@@ -273,6 +314,7 @@ function getOrCreateSubFolder_(parent, name) {
 
 function applyMappingsByLabel_(sheet, data, mappings) {
   const cache = new Map();
+
   mappings.forEach(m => {
     const val = normalizeValue_(pickFirst_(data, m.keys));
     if (val === "") return;
@@ -282,10 +324,13 @@ function applyMappingsByLabel_(sheet, data, mappings) {
       if (cell) {
         let targetCol = cell.getColumn();
         const merges = cell.getMergedRanges();
-        if (merges.length > 0) targetCol = merges[0].getLastColumn();
-        
+
+        if (merges.length > 0) {
+          targetCol = merges[0].getLastColumn();
+        }
+
         sheet.getRange(cell.getRow(), targetCol + (m.offset || 1)).setValue(val);
-        break; 
+        break;
       }
     }
   });
@@ -294,7 +339,7 @@ function applyMappingsByLabel_(sheet, data, mappings) {
 function findLabelCell_(sheet, label, cache) {
   const key = `${sheet.getSheetId()}_${label}`;
   if (cache.has(key)) return cache.get(key);
-  
+
   const cell = sheet.createTextFinder(label).matchEntireCell(false).findNext();
   cache.set(key, cell);
   return cell;
@@ -302,13 +347,19 @@ function findLabelCell_(sheet, label, cache) {
 
 function toHiragana_(str) {
   if (!str) return "";
-  return str.replace(/[\u30a1-\u30f6]/g, m => String.fromCharCode(m.charCodeAt(0) - 0x60));
+  return str.replace(/[\u30a1-\u30f6]/g, m =>
+    String.fromCharCode(m.charCodeAt(0) - 0x60)
+  );
 }
 
 function getHeaderToColMap_(sheet) {
   const map = {};
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  headers.forEach((h, i) => { if (h) map[String(h).trim()] = i + 1; });
+
+  headers.forEach((h, i) => {
+    if (h) map[String(h).trim()] = i + 1;
+  });
+
   return map;
 }
 
@@ -316,19 +367,24 @@ function getRowObjectByHeader_(sheet, row) {
   const colMap = getHeaderToColMap_(sheet);
   const values = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
   const obj = {};
-  Object.keys(colMap).forEach(h => { obj[h] = values[colMap[h] - 1]; });
+
+  Object.keys(colMap).forEach(h => {
+    obj[h] = values[colMap[h] - 1];
+  });
+
   return obj;
 }
 
 function pickFirst_(data, keys) {
-  for (const k of keys) { 
-    if (data[k] !== undefined && data[k] !== "") return data[k]; 
+  for (const k of keys) {
+    if (data[k] !== undefined && data[k] !== "") return data[k];
   }
   return "";
 }
 
 function normalizeValue_(v) {
-  if (v instanceof Date) return Utilities.formatDate(v, "Asia/Tokyo", "yyyy/MM/dd");
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, "Asia/Tokyo", "yyyy/MM/dd");
+  }
   return v !== null && v !== undefined ? String(v).trim() : "";
 }
-
