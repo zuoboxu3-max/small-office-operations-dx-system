@@ -74,11 +74,7 @@ function _postToAdmin_(action, payload) {
 
 /** 実行者のメアドを取得 */
 function _safeExecutorEmail_() {
-  try {
-    return Session.getEffectiveUser().getEmail() || "unknown";
-  } catch (e) {
-    return "unknown";
-  }
+  return "anonymous@example.com";
 }
 
 function testAdminLog() {
