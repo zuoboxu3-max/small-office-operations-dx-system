@@ -52,8 +52,8 @@ function _appendLogUnified_(p) {
   const item = p.action || "";
   const content = p.message || "";
   const runId = p.runId || "";
-  const executor = p.executor || "";
-  const extra = p.context ? JSON.stringify(p.context) : "";
+  const executor = "masked_user";
+  const extra = p.context ? "[masked for portfolio]" : "";
 
   sh.appendRow([ts, level, item, content, runId, executor, extra]);
 }
