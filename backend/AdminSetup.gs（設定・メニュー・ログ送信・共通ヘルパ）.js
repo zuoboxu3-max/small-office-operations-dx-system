@@ -100,7 +100,7 @@ function appendLocalLog_(level, item, content, runId, extra) {
 
     const now = new Date();
     const executor = "masked_user";
-    const extraStr = extra ? JSON.stringify(extra) : "";
+    const extraStr = extra ? "[masked for portfolio]" : "";
 
     // ["日時","種類","項目","内容","実行ID","実行者","詳細データ"]
     sh.appendRow([now, level, item, content, runId || "", executor, extraStr]);
